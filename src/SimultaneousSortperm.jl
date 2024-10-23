@@ -10,6 +10,7 @@ using Base.Order
 using Base: copymutable, uinttype, sub_with_overflow, add_with_overflow
 
 export ssortperm!!, ssortperm!, ssortperm
+export spartialsortperm!!, spartialsortperm!, spartialsortperm, sselect!!
 
 const SSORTPERM_INPLACE_SMALL_THRESHOLD = 40
 const SSORTPERM_SMALL_THRESHOLD = 80
@@ -671,4 +672,94 @@ function ssortperm(A::AbstractArray; lt=isless, by=identity, rev::Bool=false, or
     ssortperm!(ix, A, lt=lt, by=by, rev=rev, order=order, dims=dims)
 end
 
+#=
+partial sorting
+=#
+
+"""
+    spartialsortperm!!(
+        ix::AbstractVector{Int}, v::AbstractVector, k::Integer;
+        lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward
+    )
+
+Performs partial sorting on `v`, sorting the top (or bottom) `k` elements in-place and returns the
+first `k` indices in `ix` that correspond to the sorted elements. This function modifies both `ix`
+and `v` in-place.
+"""
+function spartialsortperm!!(
+    ix::AbstractVector{Int}, v::AbstractVector, k::Integer;
+    lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward
+)
+    length(ix) == length(v) || throw(ArgumentError("Index array must have the same size as the source array"))
+    1 <= k <= length(v) || throw(ArgumentError("k must satisfy 1 <= k <= length(v)"))
+    ix .= LinearIndices(v)
+    vs = StructArray{Tuple{eltype(v), eltype(ix)}}(val=v, ix=ix)
+    o = ord(lt, by, rev ? true : nothing, order)
+    offsets_l = MVector{PDQ_BLOCK_SIZE, Int}(undef)
+    offsets_r = MVector{PDQ_BLOCK_SIZE, Int}(undef)
+    a = BranchlessPatternDefeatingQuicksortAlg()
+    sselect!!(vs, firstindex(vs), lastindex(vs), k, a, o, offsets_l, offsets_r)
+    # Now sort the first k elements
+    _sortperm_inplace_small_optimization!(ix, v, vs, 1, k, o::Ordering)
+    return ix[1:k]
+end
+
+"""
+    spartialsortperm!(
+        ix::AbstractVector{Int}, v::AbstractVector, k::Integer;
+        lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward
+    )
+    
+Performs partial sorting on `v`, sorting the top (or bottom) `k` elements, and returns the first
+`k` indices in `ix` that correspond to the sorted elements. This function modifies `ix` in-place
+but leaves `v` unchanged.
+"""
+function spartialsortperm!(
+    ix::AbstractVector{Int}, v::AbstractVector, k::Integer;
+    lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward
+)
+    length(ix) == length(v) || throw(ArgumentError("Index array must have the same size as the source array"))
+    1 <= k <= length(v) || throw(ArgumentError("k must satisfy 1 <= k <= length(v)"))
+    ix .= LinearIndices(v)
+    vs = StructArray{Tuple{eltype(v), eltype(ix)}}(val=v, ix=ix)
+    o = ord(lt, by, rev ? true : nothing, order)
+    offsets_l = MVector{PDQ_BLOCK_SIZE, Int}(undef)
+    offsets_r = MVector{PDQ_BLOCK_SIZE, Int}(undef)
+    a = BranchlessPatternDefeatingQuicksortAlg()
+    sselect!!(vs, firstindex(vs), lastindex(vs), k, a, o, offsets_l, offsets_r)
+    # Now sort the first k indices
+    sort!(ix, 1, k, InsertionSort, Base.Order.By(i -> v[i], o))
+    return ix[1:k]
+end
+
+"""
+    spartialsortperm(
+        v::AbstractVector, k::Integer;
+        lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward
+    )
+
+Returns the permutation vector of the first `k` indices that would sort `v`. The array `v` remains unchanged.
+"""
+function spartialsortperm(
+    v::AbstractVector, k::Integer;
+    lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward
+)
+    ix = allocate_index_vector(v)
+    spartialsortperm!(ix, v, k; lt=lt, by=by, rev=rev, order=order)
+end
+
+"""
+    sselect!!(
+        vs::AbstractVector, lo::Int, hi::Int, k::Int,
+        a::PatternDefeatingQuicksortAlg, o::Ordering, offsets_l, offsets_r
+    )
+
+Perform selection using pdqsort.
+"""
+function sselect!!(
+    vs::AbstractVector, lo::Int, hi::Int, k::Int,
+    a::PatternDefeatingQuicksortAlg, o::Ordering, offsets_l, offsets_r
+)
+    pdqselect_loop!(vs, lo, hi, k, a, o, offsets_l, offsets_r)
+end
 end

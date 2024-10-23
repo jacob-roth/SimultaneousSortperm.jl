@@ -498,6 +498,43 @@ function pdqsort_loop!(v::AbstractVector, lo::Integer, hi::Integer, a::PatternDe
     end
 end
 
+# Partial Selection Function Using pdqsort
+
+function pdqselect_loop!(v::AbstractVector, lo::Int, hi::Int, k::Int,
+                         a::PatternDefeatingQuicksortAlg, o::Ordering, offsets_l, offsets_r)
+    @inbounds while lo <= hi
+        len = hi - lo + 1
+
+        # Use insertion sort for small partitions
+        if len <= PDQ_SMALL_THRESHOLD
+            sort!(v, lo, hi, InsertionSort, o)
+            return
+        end
+
+        # Choose pivot using median-of-three or ninther selection
+        m = midpoint(lo, hi + 1)
+        if len > PDQ_NINTHER_THRESHOLD
+            selectpivot_ninther!(v, lo, m, hi, o)
+        else
+            sort3!(v, m, lo, hi, o)
+            swap!(v, lo, m)
+        end
+
+        # Partition around the pivot
+        pivot_index, _ = partition_right!(v, lo, hi, a, o, offsets_l, offsets_r)
+
+        # Decide where to recurse
+        if k < pivot_index
+            hi = pivot_index - 1
+        elseif k > pivot_index
+            lo = pivot_index + 1
+        else
+            return
+        end
+    end
+end
+
+
 # integer logarithm base two, ignoring sign
 function log2i(n::Integer)
     sizeof(n) << 3 - leading_zeros(abs(n))
