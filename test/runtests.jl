@@ -14,8 +14,7 @@ function randn_with_nans(n,p)
     return v
 end
 
-println("testing")
-# @testset "SimultaneousSortperm.jl" begin
+@testset "SimultaneousSortperm.jl" begin
     for n in [(0:33)..., 100, 999, 1000, 1001]
         for T in [UInt16, Int, Float64], rev in [false, true], lt in [isless, >]
             for order in [Base.Order.Forward, Base.Order.Reverse], by in [identity, x->x÷100]
@@ -56,9 +55,9 @@ println("testing")
 
                 if n>=1
                     for k in max.(Int.(ceil.(n .* [0.01, 0.1, 0.5, 0.9, 0.95])),1)
-                        println("partial")
-                        println("(T,rev,lt,order,by,(n,k)) = ", (T,rev,lt,order,by,(n,k)))
-                        display(v)
+                        # println("partial")
+                        # println("(T,rev,lt,order,by,(n,k)) = ", (T,rev,lt,order,by,(n,k)))
+                        # display(v)
                         v0 = copy(v)
                         v2 = copy(v)
                         pref_k = sortperm(v, lt=lt, by=by, rev=rev, order=order)
@@ -99,7 +98,7 @@ println("testing")
             end
         end
     end
-# end;
+end;
 
 @testset "OffsetArrays" begin
     for n in [(0:33)..., 100, 999, 1000, 1001]
