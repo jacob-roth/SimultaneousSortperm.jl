@@ -14,7 +14,8 @@ function randn_with_nans(n,p)
     return v
 end
 
-@testset "SimultaneousSortperm.jl" begin
+println("testing")
+# @testset "SimultaneousSortperm.jl" begin
     for n in [(0:33)..., 100, 999, 1000, 1001]
         for T in [UInt16, Int, Float64], rev in [false, true], lt in [isless, >]
             for order in [Base.Order.Forward, Base.Order.Reverse], by in [identity, x->x÷100]
@@ -52,10 +53,53 @@ end
                 elseif !skiptest
                     @test v2 == vref
                 end
+
+                if n>=1
+                    for k in max.(Int.(ceil.(n .* [0.01, 0.1, 0.5, 0.9, 0.95])),1)
+                        println("partial")
+                        println("(T,rev,lt,order,by,(n,k)) = ", (T,rev,lt,order,by,(n,k)))
+                        display(v)
+                        v0 = copy(v)
+                        v2 = copy(v)
+                        pref_k = sortperm(v, lt=lt, by=by, rev=rev, order=order)
+                        vref_k = sort(v, lt=lt, by=by, rev=rev, order=order)
+                        p = zeros(Int, n)
+
+                        #=
+                        v2 = copy(v)
+                        p[1:k] .= spartialsortperm(v2, k, lt=lt, by=by, rev=rev, order=order)
+                        @test by.(v0[p[1:k]]) == by.(v0[pref_k[1:k]])
+                        # p[1:k] == pref_k[1:k] || println((T,rev,lt,order,by,(n,k)))
+                        
+                        v2 = copy(v)
+                        p .= 0
+                        spartialsortperm!(p, v2, k, lt=lt, by=by, rev=rev, order=order)
+                        @test by.(v0[p[1:k]]) == by.(v0[pref_k[1:k]])
+                        # p[1:k] == pref_k[1:k] || println((T,rev,lt,order,by,(n,k)))
+                        if VERSION >= v"1.7"
+                            @test by.(v2[1:k]) == by.(vref_k[1:k]) skip=skiptest
+                        elseif !skiptest
+                            @test by.(v2[1:k]) == by.(vref_k[1:k])
+                        end
+                        =#
+
+                        v2 = copy(v)
+                        p .= 0
+                        spartialsortperm!!(p, v2, k, lt=lt, by=by, rev=rev, order=order)
+                        @test by.(v0[p[1:k]]) == by.(v0[pref_k[1:k]])
+                        if VERSION >= v"1.7"
+                            @test by.(v2[1:k]) == by.(vref_k[1:k]) skip=skiptest
+                        elseif !skiptest
+                            @test by.(v2[1:k]) == by.(vref_k[1:k])
+                        end
+                        p[1:k] == pref_k[1:k] || println((T,rev,lt,order,by,(n,k)))
+                        # v2[1:k] == vref_k[1:k] || println((T,rev,lt,order,by,(n,k)))
+                    end
+                end
             end
         end
     end
-end;
+# end;
 
 @testset "OffsetArrays" begin
     for n in [(0:33)..., 100, 999, 1000, 1001]

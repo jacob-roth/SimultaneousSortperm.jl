@@ -10,7 +10,8 @@ using Base.Order
 using Base: copymutable, uinttype, sub_with_overflow, add_with_overflow
 
 export ssortperm!!, ssortperm!, ssortperm
-export spartialsortperm!!, spartialsortperm!, spartialsortperm, sselect!!
+# export spartialsortperm!!, spartialsortperm!, spartialsortperm, sselect!!
+export spartialsortperm!!, sselect!! # spartialsortperm!, spartialsortperm
 
 const SSORTPERM_INPLACE_SMALL_THRESHOLD = 40
 const SSORTPERM_SMALL_THRESHOLD = 80
@@ -694,7 +695,7 @@ function spartialsortperm!!(
     1 <= k <= length(v) || throw(ArgumentError("k must satisfy 1 <= k <= length(v)"))
     ix .= LinearIndices(v)
     vs = StructArray{Tuple{eltype(v), eltype(ix)}}(val=v, ix=ix)
-    o = ord(lt, by, rev ? true : nothing, order)
+    o = ord(lt, x -> by(x[1]), rev ? true : nothing, order)
     offsets_l = MVector{PDQ_BLOCK_SIZE, Int}(undef)
     offsets_r = MVector{PDQ_BLOCK_SIZE, Int}(undef)
     a = BranchlessPatternDefeatingQuicksortAlg()
@@ -704,6 +705,7 @@ function spartialsortperm!!(
     return ix[1:k]
 end
 
+#=
 """
     spartialsortperm!(
         ix::AbstractVector{Int}, v::AbstractVector, k::Integer;
@@ -722,13 +724,14 @@ function spartialsortperm!(
     1 <= k <= length(v) || throw(ArgumentError("k must satisfy 1 <= k <= length(v)"))
     ix .= LinearIndices(v)
     vs = StructArray{Tuple{eltype(v), eltype(ix)}}(val=v, ix=ix)
-    o = ord(lt, by, rev ? true : nothing, order)
+    o = ord(lt, x -> by(x[1]), rev ? true : nothing, order)
     offsets_l = MVector{PDQ_BLOCK_SIZE, Int}(undef)
     offsets_r = MVector{PDQ_BLOCK_SIZE, Int}(undef)
     a = BranchlessPatternDefeatingQuicksortAlg()
     sselect!!(vs, firstindex(vs), lastindex(vs), k, a, o, offsets_l, offsets_r)
     # Now sort the first k indices
-    sort!(ix, 1, k, InsertionSort, Base.Order.By(i -> v[i], o))
+    # sort!(ix, 1, k, InsertionSort, Base.Order.By(i -> v[i], o))
+    _sortperm_inplace_small_optimization!(ix, v, vs, 1, k, o::Ordering)
     return ix[1:k]
 end
 
@@ -747,6 +750,7 @@ function spartialsortperm(
     ix = allocate_index_vector(v)
     spartialsortperm!(ix, v, k; lt=lt, by=by, rev=rev, order=order)
 end
+=#
 
 """
     sselect!!(
